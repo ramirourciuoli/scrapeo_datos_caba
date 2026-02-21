@@ -32,6 +32,8 @@ from flask import Flask, jsonify, request, send_from_directory
 # Importamos tu “motor” de catastro (tu script actual, renombrado a módulo)
 # IMPORTANTE: api_datos_catastrales.py debe estar en la misma carpeta.
 import api_datos_catastrales as adc
+import api_datos_usig as usig
+import api_datos_utiles as utiles
 
 app = Flask(__name__)
 
@@ -72,6 +74,15 @@ def api_catastro():
         parcela = adc.catastro_parcela_by_smp(smp)
         geometria = adc.catastro_geometria_by_smp(smp)
 
+        cx, cy = adc.geojson_centroid_xy(geometria)
+        datos_utiles = None
+        if cx is not None and cy is not None:
+          try:
+                datos_utiles = usig.usig_datos_utiles_por_xy(cx, cy)
+          except Exception as e:
+           dbg["datos_utiles_error"] = str(e)
+        
+
         # 3) Calcular área (m²) desde la geometría (GeoJSON) — sin shapely
         try:
             area_m2 = adc.geojson_area_m2(geometria)
@@ -88,6 +99,8 @@ def api_catastro():
             "area_m2": area_m2,
             # útil en etapa de pruebas (podés apagarlo después)
             "debug": dbg,
+            "centroide_xy": {"x": cx, "y": cy},
+            "datos_utiles": datos_utiles,
         })
 
     except Exception as e:

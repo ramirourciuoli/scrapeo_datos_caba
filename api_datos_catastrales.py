@@ -20,9 +20,10 @@ def dump(path: Path, obj):
 
 def find_smp_anywhere(obj) -> str | None:
     patterns = [
-        r"\b\d{2}-\d{3}-\d{3}\b",           # 01-001-010
-        r"\b\d{3}-\d{3}[A-Z]-\d{3}[A-Z]\b", # 056-066A-014A
-        r"\b\d{2}-\d{3}[A-Z]-\d{3}[A-Z]\b", # variantes raras
+    r"\b\d{2}-\d{3}-\d{3}\b",            # 01-001-010
+    r"\b\d{3}-\d{3}[A-Z]-\d{3}\b",       # 044-097A-029  ✅ (TU CASO)
+    r"\b\d{3}-\d{3}[A-Z]-\d{3}[A-Z]\b",  # 056-066A-014A
+    r"\b\d{2}-\d{3}[A-Z]-\d{3}[A-Z]\b",  # variantes raras
     ]
 
     def scan_string(s: str) -> str | None:
@@ -271,6 +272,64 @@ def resolver_paquete_catastro(address: str) -> dict:
         "area_m2": area_m2,
         "debug": dbg
     }
+def polygon_centroid(ring):
+    """
+    ring: lista de puntos [[x,y], [x,y], ...] (idealmente cerrado)
+    Retorna (cx, cy) usando fórmula de centroide de polígono.
+    """
+    if len(ring) < 3:
+        return None, None
+
+    # Asegurar cierre
+    if ring[0] != ring[-1]:
+        ring = ring + [ring[0]]
+
+    A = 0.0
+    Cx = 0.0
+    Cy = 0.0
+    for i in range(len(ring) - 1):
+        x0, y0 = ring[i]
+        x1, y1 = ring[i + 1]
+        cross = x0 * y1 - x1 * y0
+        A += cross
+        Cx += (x0 + x1) * cross
+        Cy += (y0 + y1) * cross
+
+    A *= 0.5
+    if A == 0:
+        return None, None
+
+    Cx /= (6.0 * A)
+    Cy /= (6.0 * A)
+    return Cx, Cy
+
+def geojson_centroid_xy(geojson: dict) -> tuple[float | None, float | None]:
+    """
+    Toma la geometría de catastro/geometria (GeoJSON en SRID 97433 en tu caso)
+    y retorna un centroide (x,y) aproximado del polígono exterior.
+    """
+    t = geojson.get("type")
+    if t == "FeatureCollection":
+        geom = geojson["features"][0]["geometry"]
+    elif t == "Feature":
+        geom = geojson["geometry"]
+    else:
+        geom = geojson
+
+    gt = geom.get("type")
+    coords = geom.get("coordinates")
+
+    if gt == "Polygon":
+        outer_ring = coords[0]
+        return polygon_centroid(outer_ring)
+
+    if gt == "MultiPolygon":
+        # Tomamos el primer polígono como aproximación
+        outer_ring = coords[0][0]
+        return polygon_centroid(outer_ring)
+
+    return None, None
+
 
 if __name__ == "__main__":
     test_by_address("Davila 1130, CABA")
