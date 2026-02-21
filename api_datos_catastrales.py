@@ -153,6 +153,7 @@ def polygon_area(coords):
 
 def geojson_area_m2(geojson: dict) -> float:
     t = geojson.get("type")
+
     if t == "FeatureCollection":
         geom = geojson["features"][0]["geometry"]
     elif t == "Feature":
@@ -161,11 +162,16 @@ def geojson_area_m2(geojson: dict) -> float:
         geom = geojson
 
     gt = geom.get("type")
+
     if gt == "Polygon":
         return polygon_area(geom["coordinates"])
+
     if gt == "MultiPolygon":
-        return sum(polygon_area(poly[0]) if poly and isinstance(poly[0], list) and isinstance(poly[0][0], list) else polygon_area(poly)
-                   for poly in geom["coordinates"])
+        total = 0.0
+        for poly in geom["coordinates"]:
+            total += polygon_area(poly)
+        return total
+    
     raise ValueError(f"Geometría no soportada: {gt}")
 
 # ====== MAIN ======
